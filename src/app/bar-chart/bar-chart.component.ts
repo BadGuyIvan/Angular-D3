@@ -29,7 +29,8 @@ export class BarChartComponent implements OnInit, OnChanges {
   private xAxis: any;
   private yAxis: any;
 
-  constructor() {}
+  constructor() {
+  }
 
   ngOnInit() {
     this.createChart();
@@ -84,10 +85,7 @@ export class BarChartComponent implements OnInit, OnChanges {
     this.xAxis = svg
       .append("g")
       .attr("class", "axis axis-x")
-      .attr(
-        "transform",
-        `translate(${this.margin.left}, ${this.margin.top + this.height})`
-      )
+      .attr("transform",`translate(${this.margin.left}, ${this.margin.top + this.height})`)
       .call(d3.axisBottom(this.xScale));
     this.yAxis = svg
       .append("g")

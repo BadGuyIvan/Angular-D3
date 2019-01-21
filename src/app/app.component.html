@@ -1,2 +1,4 @@
 <app-bar-chart [data]="chartData"></app-bar-chart>
-<app-arc-chart></app-arc-chart>
+<app-arc-chart [data]="pieChartData"></app-arc-chart>
+<app-line-chart [data]="lineChart"></app-line-chart>
+<button (click)="changedDataPieChart()">Generate Data</button>
