@@ -5,7 +5,8 @@ import {
   ElementRef,
   Input,
   OnChanges,
-  SimpleChanges
+  SimpleChanges,
+  ViewEncapsulation
 } from "@angular/core";
 import * as d3 from "d3";
 import { interpolatePath } from "d3-interpolate-path";
@@ -13,10 +14,11 @@ import { interpolatePath } from "d3-interpolate-path";
 @Component({
   selector: "app-line-chart",
   templateUrl: "./line-chart.component.html",
-  styleUrls: ["./line-chart.component.css"]
+  styleUrls: ["./line-chart.component.css"],
+  encapsulation: ViewEncapsulation.None
 })
 export class LineChartComponent implements OnInit, OnChanges {
-  constructor() {}
+  constructor() { }
 
   @ViewChild("lineChart")
   private container: ElementRef;
@@ -40,15 +42,27 @@ export class LineChartComponent implements OnInit, OnChanges {
   private svg: any;
   private area: any;
 
+  getRandomArbitrary(min, max) {
+    return Math.random() * (max - min) + min;
+  }
+
+  line_length(pointA, pointB) {
+    const lengthX = pointB.x - pointA.x;
+    const lengthY = pointB.y - pointA.y;
+    return {
+      length: Math.sqrt(Math.pow(lengthX, 2) + Math.pow(lengthY, 2)),
+      angle: Math.atan2(lengthY, lengthX)
+    }
+  }
+
   createLineChart() {
+    let that = this;
     const element = this.container.nativeElement;
     this.width = element.offsetWidth - this.margin.left - this.margin.right;
     this.height = element.offsetHeight - this.margin.top - this.margin.bottom;
-    var bisectDate = d3.bisector(function(d) {
+    var bisectDate = d3.bisector(function (d) {
       return d.x;
     }).left;
-    let that = this;
-
     this.svg = d3
       .select(element)
       .append("svg")
@@ -59,7 +73,7 @@ export class LineChartComponent implements OnInit, OnChanges {
     //bottom Axis
     const xDomain = d3.extent(this.data[0].data, d => d.x);
     const yDomain = d3.extent(this.data[0].data, d => d.y);
-    console.log(xDomain);
+
     this.xScale = d3
       .scaleLinear()
       .domain(xDomain)
@@ -73,8 +87,8 @@ export class LineChartComponent implements OnInit, OnChanges {
     this.line = d3
       .line()
       .curve(d3.curveMonotoneX)
-      .x((d, i) => this.xScale(d.x))
-      .y((d, i) => this.yScale(d.y));
+      .x((d, index) => this.xScale(index))
+      .y((d) => this.yScale(d.y))
 
     this.xAxis = this.svg
       .append("g")
@@ -101,164 +115,137 @@ export class LineChartComponent implements OnInit, OnChanges {
       .selectAll(".line-group")
       .data(this.data)
       .enter()
-      .append("g")
-      .attr("class", "line-group")
       .append("path")
       .attr("class", "line")
       .attr("d", d => this.line(d.data))
-      .attr("stroke", "black")
+      .attr("stroke", d => d.color)
       .attr("stroke-width", "2")
-      .attr("fill", "none");
+      .attr("fill", "none")
+
     //----------------------------------------------------------------------------------------
-    //top Axis
-    const x1Domain = d3.extent(this.data2, d => d.x);
-
-    this.x1Scale = d3
-      .scaleLinear()
-      .domain(x1Domain)
-      .range([0, this.width]);
-
-    this.x1Axis = this.svg
-      .append("g")
-      .attr("class", "axis axis-x1")
-      .attr("transform", `translate(${this.margin.left}, ${this.margin.top})`)
-      .call(d3.axisTop(this.x1Scale));
-
-    this.line2 = d3
-      .line()
-      .curve(d3.curveMonotoneX)
-      .x((d, i) => this.x1Scale(d.x))
-      .y((d, i) => this.yScale(d.y));
-
-    this.svg
-      .append("g")
-      .attr("class", "path2")
-      .attr(
-        "transform",
-        `translate(${this.margin.left + 1}, ${this.margin.top})`
-      )
-      .append("path")
-      .datum(this.data2)
-      .attr("class", "line")
-      .attr("d", this.line2)
-      .attr("stroke", "yellow")
-      .attr("stroke-width", "2")
-      .attr("fill", "none");
-    //----------------------------------------------------------------------------------------
-
-    // this.area = d3.area()
-    //   .curve(d3.curveMonotoneX)
-    //   .x((d) => this.xScale(d.x))
-    //   .y1((d) => this.yScale(d.y))
-    //   .y0(this.height)
-
-    // this.svg.select('g.path')
-    //   .append("path")
-    //   .datum(this.data)
-    //   .attr("class", "area")
-    //   .attr("d", this.area)
-    //   .attr('fill','lightsteelblue')
-    //----------------------------------------------------------------------------------------
-    //mouse-over-effects
+    // mouse-over-effects
     let mouseG = this.svg
       .append("g")
       .attr("class", "mouse-over-effects")
       .attr("transform", `translate(${this.margin.left}, ${this.margin.top})`);
 
     let mousePerLine = mouseG
-      .selectAll("g")
-      .data(d3.selectAll(".path")._groups)
-      .enter()
       .append("g")
-      .attr("class", "mouse-per-line");
+      .attr("class", "mouse-per-line")
+      .style("display", "none");
+
+    var mousePerLine_visibule = mousePerLine;
 
     mousePerLine
-      .append("circle")
-      .attr("r", 7)
-      .style("fill", "black")
-      .style("stroke-width", "1px")
-      .style("opacity", "0");
-
-    //----------------------------------------------------------------------
-    let mousePerLine_2 = mouseG
-      .selectAll("g")
-      .data([1, 2])
+      .selectAll('circle')
+      .data(that.svg.select(".lines").selectAll('path')._groups[0])
       .enter()
-      .append("g")
-      .attr("class", "mouse-per-line_2");
-
-    mousePerLine_2
       .append("circle")
       .attr("r", 7)
-      .style("fill", "yellow")
       .style("stroke-width", "1px")
-      .style("opacity", "0");
+    //------------------------------------------------------------------------------
+    var tooltip = d3.select('#line_chart')
+      .append("xhtml:div")
+      .attr("class", "tooltip")
+      .style("opacity", 0)
+      .style("top", '0')
+      .style('position', 'absolute')
 
-    mouseG
-      .append("svg:rect") // append a rect to catch mouse movements on canvas
+    var table = tooltip.append('table')
+    var thead = table.append('thead')
+    var tbody = table.append('tbody')
+
+    var rows = tbody.selectAll('tr')
+      .data(this.data)
+      .enter()
+      .append('tr')
+      .append("td")
+      .append("div")
+      .attr("class", "container")
+
+    rows
+      .append("svg")
+      .style("height", "20px")
+      .style("width", "20px")
+      .append("circle")
+      .attr("r", 7)
+      .attr('cx', "10")
+      .attr('cy', '10')
+      .attr("fill", d => d.color)
+      .style("stroke-width", "1px")
+
+    rows.append("div")
+      .attr("class", "value")
+
+    d3.select("#line_chart")
+      .append("svg")
+      .attr("class", "mouse_over")
+      .append("rect") // append a rect to catch mouse movements on canvas
       .attr("width", this.width) // can't catch mouse events on a g element
       .attr("height", this.height)
-      .attr("fill", "none")
-      .attr("pointer-events", "all")
-      .on("mouseout", function() {
-        // on mouse out hide line, circles and text
-        d3.selectAll(".mouse-per-line circle, .mouse-per-line_2 circle").style(
-          "opacity",
-          "0"
-        );
+      .attr("transform", `translate(${this.margin.left}, ${this.margin.top})`)
+      .attr("fill", "transparent")
+      .on("mouseover", function () {
+        mousePerLine_visibule.style("display", null)
+        d3.select('.tooltip')
+          .style("opacity", "1")
       })
-      .on("mouseover", function() {
-        // on mouse in show line, circles and text
-        d3.selectAll(".mouse-per-line circle, .mouse-per-line_2 circle").style(
-          "opacity",
-          "1"
-        );
-      })
-      .on("mousemove", function() {
-        // mouse moving over canvas
-        let x0 = that.xScale.invert(d3.mouse(this)[0]);
-        let i = bisectDate(that.data, x0, 1);
-        let d0 = that.data[i - 1];
-        let d1 = that.data[i];
-        let d = x0 - d0.x > d1.x - x0 ? d1 : d0;
-        //---------------------------------
-        let x1_0 = that.x1Scale.invert(d3.mouse(this)[0]);
-        let i1 = bisectDate(that.data2, x1_0, 1);
-        let d1_0 = that.data2[i1 - 1];
-        let d1_1 = that.data2[i1];
-        let d_1 = x1_0 - d1_0.x > d1_1.x - x1_0 ? d1_1 : d1_0;
 
-        d3.selectAll(".mouse-per-line")
-          .selectAll("circle")
-          .attr("transform", function() {
-            return `translate(${that.xScale(d.x)}, ${that.yScale(d.y)})`;
-          });
-        d3.selectAll(".mouse-per-line_2")
-          .selectAll("circle")
-          .attr("transform", function() {
-            return `translate(${that.x1Scale(d_1.x)}, ${that.yScale(d_1.y)})`;
-          });
-      });
+      .on("mouseout", function () {
+        mousePerLine_visibule.style("display", "none")
+        // on mouse out hide line, circles and text
+        d3.selectAll(".tooltip")
+          .style("opacity", "0")
+          .style("transform", "translate(0px,0px)")
+      })
+      .on("mousemove", function () {
+        // mouse moving over canvas
+        var canvas_mouse = d3.mouse(this);
+        let x0 = that.xScale.invert(d3.mouse(this)[0]);
+        that.svg.select(".lines")
+          .selectAll('path')
+          .each((data, index) => {
+            let i = bisectDate(that.data[index].data, x0, 1);
+            let d0 = that.data[index].data[i - 1];
+            let d1 = that.data[index].data[i];
+            let d = x0 - d0.x > d1.x - x0 ? d1 : d0;
+
+            var cord = document.getElementsByClassName('tooltip')[0].getBoundingClientRect();
+
+            var x = canvas_mouse[0] + 20 <= that.width / 2 ? canvas_mouse[0] + cord.width / 2 : canvas_mouse[0] - cord.width
+
+            d3.select('.tooltip')
+              .style("transform", function () {
+                return `translate(${x}px, ${(canvas_mouse[1] + 20) - cord.height / 2}px)`;
+              })
+
+            d3.select(`tr:nth-child(${index + 1}) .value`)
+              .text(Math.round(d.y))
+
+            d3.select(".mouse-per-line")
+              .select(`circle:nth-child(${index + 1})`)
+              .style("fill", () => that.data[index].color)
+              .attr("transform", function () {
+                return `translate(${that.xScale(d.x)}, ${that.yScale(d.y)})`;
+              });
+          })
+      })
   }
 
   excludeSegment(a, b) {
     return a.y === b.y && a.y === 300; // here 300 is the max X
   }
 
+  // tweenDash() {
+  //   const l = this.getTotalLength();
+  //   const interpolate = d3.interpolateString(`0,${l}`, `${l},${l}`);
+  //   return function(t) { return interpolate(t); };
+  // }
+
   updateChart() {
     let that = this;
-    const xDomain = d3.extent(this.data, d => d.x);
-    const yDomain = d3.extent(this.data, d => d.y);
-
-    //update top xAxis
-    const x1Domain = d3.extent(this.data2, d => d.x);
-
-    this.x1Scale = d3
-      .scaleLinear()
-      .domain(x1Domain)
-      .range([0, this.width]);
-
-    this.x1Axis.transition().call(d3.axisTop(this.x1Scale));
+    const xDomain = d3.extent(this.data[0].data, d => d.x);
+    const yDomain = d3.extent(this.data[0].data, d => d.y);
 
     this.xScale = d3
       .scaleLinear()
@@ -274,80 +261,92 @@ export class LineChartComponent implements OnInit, OnChanges {
     this.yAxis.transition().call(d3.axisLeft(this.yScale));
 
     let update = this.svg
-      .select(".path")
-      .select("path")
-      .datum(this.data);
+      .select(".lines")
+      .selectAll("path")
+      .data(this.data)
 
-    let update2 = this.svg
-      .select(".path2")
-      .select("path")
-      .datum(this.data2);
-    // let updateArea = this.svg.select('.path').select('.area').datum(this.data)
-
-    // updateArea.exit().remove();
-    // update.exit().remove();
-
-    // updateArea
-    // .transition()
-    // .delay(0)
-    // .duration(1000)
-    // .attrTween('d', function(d) {
-    //   var previous = d3.select(this).attr('d');
-    //   var current = that.area(d);
-    //   return interpolatePath(previous, current, that.excludeSegment);
-    // });
-    update2
+    update.exit()
       .transition()
-      .delay(0)
-      .duration(1000)
-      .attrTween("d", function(d) {
-        var previous = d3
-          .select(".path2")
-          .select("path")
-          .attr("d");
-        var current = that.line2(d);
-        return interpolatePath(previous, current);
-      });
+      .duration(2000)
+      .attrTween('stroke-dasharray', function () {
+        const l = this.getTotalLength();
+        const interpolate = d3.interpolateString(`${l}`, `0`);
+        return function (t) { return `${interpolate(t)},${l}`; };
+      })
+      .remove();
 
+    //--------------------------------------------------
+    //update tooltip
+
+    var update_tooltip = d3.select('tbody').selectAll('tr')
+      .data(this.data)
+
+    update_tooltip.exit().remove()
+
+    var rows = update_tooltip
+      .enter()
+      .append('tr')
+      .append("td")
+      .append("div")
+      .attr("class", "container")
+
+    rows
+      .append("svg")
+      .style("height", "20px")
+      .style("width", "20px")
+      .append("circle")
+      .attr("r", 7)
+      .attr('cx', "10")
+      .attr('cy', '10')
+      .attr("fill", d => d.color)
+      .style("stroke-width", "1px")
+
+    rows.append("div")
+      .attr("class", "value")
+
+    //--------------------------------------------------
+    //update dot
+
+    let update_dot = d3.select('.mouse-per-line').selectAll('circle')
+      .data(this.data)
+
+    update_dot.exit().remove()
+
+    update_dot
+      .enter()
+      .append("circle")
+      .attr("r", 7)
+      .style("stroke-width", "1px")
+
+    //need remove stroke-dasharray because when update line can be diffirent length
+    update.attr('stroke-dasharray', null)
+
+    //update exist line
     update
       .transition()
       .delay(0)
       .duration(1000)
-      .attrTween("d", function(d) {
+      .attrTween("d", function (d) {
         var previous = d3.select(this).attr("d");
-        var current = that.line(d);
+        var current = that.line(d.data);
         return interpolatePath(previous, current);
-      });
+      })
 
-    // this.svg
-    // .select('.path')
-    // .select('path')
-    // .datum(this.data)
-    // .exit()
-    // .transition()
-    // .duration(1000)
-    // .attrTween('d', function (d) {
-    //   var previous = d3.select(this).attr('d');
-    //   var current = this.line(d);
-    //   return d3.interpolatePath(previous, current);
-    // })
-    // .remove();
-
-    // this.svg
-    //   .select('.path')
-    //   .select('path')
-    //   .datum(this.data)
-    //   .transition()
-    //   .duration(1000)
-    //   .attr('d', this.line)
-
-    // this.svg
-    //   .select('.path')
-    //   .select('.area')
-    //   .datum(this.data)
-    //   .transition()
-    //   .duration(1000)
-    //   .attr("d", this.area);
+    //add new line 
+    update.enter()
+      .append("path")
+      .attr("class", "line")
+      .attr("d", d => this.line(d.data))
+      .attr("stroke", d => d.color)
+      .attr("stroke-width", "2")
+      .attr("fill", "none")
+      .transition()
+      .duration(2000)
+      .attrTween("stroke-dasharray", function () {
+        const l = this.getTotalLength();
+        const interpolate = d3.interpolateString(`0,${l}`, `${l},${l}`);
+        return function (t) { return interpolate(t); };
+      })
   }
 
   ngOnChanges(changes: SimpleChanges) {
